@@ -19,21 +19,35 @@ impl ProxyHttp for GW {
             .get(header::HOST)
             .map_or("", |x| x.to_str().unwrap_or_default());
 
-        let addr = match hostname {
-            "mus.sh" => {
-                // serve static files. idk how
-                ("127.0.0.1", 3000)
+        let domain = "localhost:6188";
+
+        let subdomain = match hostname.ends_with(domain) {
+            true => hostname.trim_end_matches(domain),
+            false => {
+                return Err(Error::explain(
+                    HTTPStatus(StatusCode::BAD_REQUEST.into()),
+                    "invalid domain",
+                ))
             }
-            "crafty.mus.sh" => ("127.0.0.1", 8443),
-            "short.mus.sh" => ("s.mus.sh", 443),
-            "s.mus.sh" => ("127.0.0.1", 8001),
-            "hompimpa.mus.sh" => ("127.0.0.1", 8082),
-            "notion-note.mus.sh" => ("127.0.0.1", 8083),
-            "scelefeed.mus.sh" => ("127.0.0.1", 8084),
-            "sso.mus.sh" => ("127.0.0.1", 8085),
-            "hahaha.mus.sh" => ("127.0.0.1", 8086),
-            "blog.mus.sh" => ("127.0.0.1", 4321),
-            "odoo.mus.sh" => ("127.0.0.1", 8069),
+        };
+        println!("subdomain: {}", subdomain);
+        let localhost = "127.0.0.1".to_string();
+
+        let addr = match subdomain {
+            "" => {
+                // serve static files. idk how
+                (localhost, 3000)
+            }
+            "crafty" => (localhost, 8443),
+            "short" => (format!("s.{domain}"), 443),
+            "s" => (localhost, 8001),
+            "hompimpa" => (localhost, 8082),
+            "notion-note" => (localhost, 8083),
+            "scelefeed" => (localhost, 8084),
+            "sso" => (localhost, 8085),
+            "hahaha" => (localhost, 8086),
+            "blog" => (localhost, 4321),
+            "odoo" => (localhost, 8069),
             _ => {
                 return Err(Error::explain(
                     HTTPStatus(StatusCode::NOT_FOUND.into()),
