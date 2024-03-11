@@ -1,52 +1,62 @@
 use async_trait::async_trait;
+use http::header;
+use http::StatusCode;
 use pingora::prelude::*;
 use std::sync::Arc;
 
-pub struct LB(Arc<LoadBalancer<RoundRobin>>);
+pub struct GW;
 #[async_trait]
-impl ProxyHttp for LB {
-    /// For this small example, we don't need context storage
+impl ProxyHttp for GW {
     type CTX = ();
     fn new_ctx(&self) -> () {
         ()
     }
 
-    async fn upstream_peer(&self, _session: &mut Session, _ctx: &mut ()) -> Result<Box<HttpPeer>> {
-        let upstream = self
-            .0
-            .select(b"", 256) // hash doesn't matter for round robin
-            .unwrap();
+    async fn upstream_peer(&self, session: &mut Session, _ctx: &mut ()) -> Result<Box<HttpPeer>> {
+        let hostname = session
+            .req_header()
+            .headers
+            .get(header::HOST)
+            .map_or("", |x| x.to_str().unwrap_or_default());
 
-        println!("upstream peer is: {:?}", upstream);
+        let addr = match hostname {
+            "mus.sh" => {
+                // serve static files. idk how
+                ("127.0.0.1", 3000)
+            }
+            "crafty.mus.sh" => ("127.0.0.1", 8443),
+            "short.mus.sh" => ("s.mus.sh", 443),
+            "s.mus.sh" => ("127.0.0.1", 8001),
+            "hompimpa.mus.sh" => ("127.0.0.1", 8082),
+            "notion-note.mus.sh" => ("127.0.0.1", 8083),
+            "scelefeed.mus.sh" => ("127.0.0.1", 8084),
+            "sso.mus.sh" => ("127.0.0.1", 8085),
+            "hahaha.mus.sh" => ("127.0.0.1", 8086),
+            "blog.mus.sh" => ("127.0.0.1", 4321),
+            "odoo.mus.sh" => ("127.0.0.1", 8069),
+            _ => {
+                return Err(Error::explain(
+                    HTTPStatus(StatusCode::NOT_FOUND.into()),
+                    "subdomain not found",
+                ))
+            }
+        };
 
-        // Set SNI to one.one.one.one
-        let peer = Box::new(HttpPeer::new(upstream, true, "one.one.one.one".to_string()));
+        let peer = Box::new(HttpPeer::new(addr, false, "".to_string()));
         Ok(peer)
     }
-
-    async fn upstream_request_filter(
-        &self,
-        _session: &mut Session,
-        upstream_request: &mut RequestHeader,
-        _ctx: &mut Self::CTX,
-    ) -> Result<()> {
-        upstream_request
-            .insert_header("Host", "one.one.one.one")
-            .unwrap();
-        Ok(())
-    }
 }
+
+pub struct RP(Arc<LoadBalancer<RoundRobin>>);
 
 fn main() {
     let mut my_server = Server::new(None).unwrap();
     my_server.bootstrap();
 
-    let upstreams = LoadBalancer::try_from_iter(["1.1.1.1:443", "1.0.0.1:443"]).unwrap();
+    let mut gw = http_proxy_service(&my_server.configuration, GW);
 
-    let mut lb = http_proxy_service(&my_server.configuration, LB(Arc::new(upstreams)));
-    lb.add_tcp("0.0.0.0:6188");
-
-    my_server.add_service(lb);
+    gw.add_tcp("0.0.0.0:6188");
+    my_server.add_service(gw);
 
     my_server.run_forever();
 }
