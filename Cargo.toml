@@ -8,4 +8,8 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.77"
 http = "1.1.0"
+lazy_static = "1.4.0"
 pingora = { version = "0.1.0", default-features = false, features = ["lb", "openssl"] }
+pingora-core = "0.1.0"
+pingora-http = "0.1.0"
+pingora-limits = "0.1.0"

@@ -996,7 +996,11 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "http 1.1.0",
+ "lazy_static",
  "pingora",
+ "pingora-core",
+ "pingora-http",
+ "pingora-limits",
 ]
 
 [[package]]
@@ -1180,6 +1184,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d11b404a0485d0655dea2fb160e74d39184d0d9aed55088650e63f146503e4e"
 dependencies = [
  "crc32fast",
+]
+
+[[package]]
+name = "pingora-limits"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43e5e9ff9d54e951dfb0296946e63369b0778cb8534f0a7d1e9079001f1fe66d"
+dependencies = [
+ "ahash",
 ]
 
 [[package]]
