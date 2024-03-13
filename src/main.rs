@@ -10,7 +10,12 @@ pub struct Context {
     pub subdomain: String,
 }
 
-pub struct GW;
+pub struct GW {
+    pub domain: String,
+}
+
+const LOCALHOST: &str = "127.0.0.1";
+
 #[async_trait]
 impl ProxyHttp for GW {
     type CTX = Context;
@@ -27,9 +32,10 @@ impl ProxyHttp for GW {
             .get(header::HOST)
             .map_or("", |x| x.to_str().unwrap_or_default());
 
-        let domain = "localhost:6188";
-        let subdomain = match hostname.ends_with(domain) {
-            true => hostname.trim_end_matches(domain).trim_end_matches('.'),
+        let subdomain = match hostname.ends_with(self.domain.as_str()) {
+            true => hostname
+                .trim_end_matches(self.domain.as_str())
+                .trim_end_matches('.'),
             false => {
                 return Err(Error::explain(
                     HTTPStatus(StatusCode::BAD_REQUEST.into()),
@@ -82,8 +88,6 @@ impl ProxyHttp for GW {
             session.set_keepalive(None);
 
             session.write_response_body(file.into()).await.unwrap();
-
-            println!("writen: {:?}", session.response_written());
             return Ok(true);
         }
 
@@ -95,24 +99,20 @@ impl ProxyHttp for GW {
         _session: &mut Session,
         ctx: &mut Self::CTX,
     ) -> Result<Box<HttpPeer>> {
-        let domain = "localhost:6188";
-
-        let localhost = "127.0.0.1".to_string();
-
-        println!("subdomain: {}", ctx.subdomain);
+        let short = format!("s.{}", self.domain);
 
         let addr = match ctx.subdomain.as_str() {
-            "crafty" => (localhost, 8443),
-            "short" => (format!("s.{domain}"), 443),
-            "s" => (localhost, 8001),
-            "hompimpa" => (localhost, 8082),
-            "notion-note" => (localhost, 8083),
-            "scelefeed" => (localhost, 8084),
-            "sso" => (localhost, 8085),
-            "hahaha" => (localhost, 8086),
-            "blog" => (localhost, 4321),
-            "odoo" => (localhost, 8069),
-            "local" => (localhost, 3000),
+            "crafty" => (LOCALHOST, 8443),
+            "short" => (short.as_str(), 443),
+            "s" => (LOCALHOST, 8001),
+            "hompimpa" => (LOCALHOST, 8082),
+            "notion-note" => (LOCALHOST, 8083),
+            "scelefeed" => (LOCALHOST, 8084),
+            "sso" => (LOCALHOST, 8085),
+            "hahaha" => (LOCALHOST, 8086),
+            "blog" => (LOCALHOST, 4321),
+            "odoo" => (LOCALHOST, 8069),
+            "local" => (LOCALHOST, 3000),
             _ => {
                 return Err(Error::explain(
                     HTTPStatus(StatusCode::NOT_FOUND.into()),
@@ -121,7 +121,7 @@ impl ProxyHttp for GW {
             }
         };
 
-        let peer = Box::new(HttpPeer::new(addr, false, domain.to_string()));
+        let peer = Box::new(HttpPeer::new(addr, false, self.domain.to_string()));
         Ok(peer)
     }
 }
@@ -132,7 +132,12 @@ fn main() {
     let mut my_server = Server::new(None).unwrap();
     my_server.bootstrap();
 
-    let mut gw = http_proxy_service(&my_server.configuration, GW);
+    let mut gw = http_proxy_service(
+        &my_server.configuration,
+        GW {
+            domain: "localhost:6188".to_string(),
+        },
+    );
 
     gw.add_tcp("0.0.0.0:6188");
     my_server.add_service(gw);
