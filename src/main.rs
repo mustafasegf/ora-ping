@@ -2,6 +2,8 @@ use async_trait::async_trait;
 use http::header;
 use http::StatusCode;
 use pingora::prelude::*;
+use pingora_core::protocols::http::SERVER_NAME;
+use pingora_http::ResponseHeader;
 use std::sync::Arc;
 
 pub struct GW;
@@ -13,12 +15,6 @@ impl ProxyHttp for GW {
     }
 
     async fn request_filter(&self, session: &mut Session, _ctx: &mut ()) -> Result<bool> {
-        // // if read is false, then connection is closed
-        // if session.read_request().await? == false {
-        //     println!("read_request: false");
-        //     return Ok(false);
-        // }
-
         let hostname = session
             .req_header()
             .headers
@@ -54,8 +50,6 @@ impl ProxyHttp for GW {
                 path_to_file
             };
 
-            println!("path_to_file: {}", path_to_file);
-
             let file = match std::fs::read(&path_to_file) {
                 Ok(file) => file,
                 Err(_) => {
@@ -66,10 +60,20 @@ impl ProxyHttp for GW {
                 }
             };
 
-            println!("file: {:?}", file);
+            let content_length = file.len();
 
-            session.write_response_body(file.into()).await?;
-            session.finish_body().await?;
+            let mut resp = ResponseHeader::build(StatusCode::OK, Some(4)).unwrap();
+            resp.insert_header(header::SERVER, &SERVER_NAME[..])
+                .unwrap();
+            resp.insert_header(header::CONTENT_LENGTH, content_length.to_string())
+                .unwrap();
+            resp.insert_header(header::CONTENT_TYPE, "text/html")
+                .unwrap();
+
+            session.write_response_header(Box::new(resp)).await.unwrap();
+            session.set_keepalive(None);
+
+            session.write_response_body(file.into()).await.unwrap();
 
             println!("writen: {:?}", session.response_written());
             return Ok(true);
